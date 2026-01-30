@@ -1,13 +1,23 @@
 # Playwright Translation Automation Project
 
-This project contains Playwright scripts to automate translation testing on `swifttranslator.com`. It generates a CSV report of the test results.
+## 📌 Project Overview
+This project contains automated functional and UI test cases for the web-based
+Singlish to Sinhala transliteration system available at:
 
-## Prerequisites
+🔗 https://www.swifttranslator.com/
 
-- Node.js (v14 or higher)
-- npm (Node Package Manager)
+The automation suite covers **35 Test Scenarios** as required by the assignment guidelines:
+- **24 Positive Scenarios:** Verifying correct translation of simple/complex sentences, grammar, and mixed-language inputs.
+- **10 Negative Scenarios:** Testing system robustness against typos, formatting issues, and technical terms.
+- **1 UI Scenario:** Verifying real-time interface behavior.
 
-## Installation
+## 🚀 Prerequisites
+
+Before running the tests, ensure you have the following installed:
+- **Node.js** (v14 or higher) - [Download Here](https://nodejs.org/)
+- **NPM** (Included with Node.js)
+
+## ⚙️ Installation
 
 1.  Clone the repository:
     ```bash
