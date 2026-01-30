@@ -21,11 +21,11 @@ Before running the tests, ensure you have the following installed:
 
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/sandundimantha/ITPM-Assignment-1-.git
+    git clone https://github.com/Lakshan-lk/Singlish-to-Sinhala-Test-Automation.git
     ```
 2.  Navigate to the project directory:
     ```bash
-    cd ITPM-Assignment-1-
+    cd test
     ```
 3.  Install dependencies:
     ```bash
@@ -45,8 +45,14 @@ By default, tests are configured to run in a headed browser (visible). To run in
 
 ```bash
 npx playwright test --headed
+npx playwright test assignment1.spec.js --debug
+npx playwright test assignment1.spec.js --headed
+npx playwright test assignment1.spec.js   
 ```
 
 ## Output
 
+```bash
+npx playwright show-report   
+```
 The test results will be saved to `test-results.csv` in the root directory.
