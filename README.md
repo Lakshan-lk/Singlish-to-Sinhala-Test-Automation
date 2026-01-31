@@ -55,4 +55,3 @@ npx playwright test assignment1.spec.js
 ```bash
 npx playwright show-report   
 ```
-The test results will be saved to `test-results.csv` in the root directory.
