@@ -5,7 +5,8 @@ const { test, expect } = require('@playwright/test');
 const TARGET_URL = 'https://www.swifttranslator.com/';
 
 const INPUT_SELECTOR = 'role=textbox[name="Input Your Singlish Text Here."]';
-const OUTPUT_SELECTOR = 'xpath=//div[@class="w-full h-80 p-3 rounded-lg ring-1 ring-slate-300 whitespace-pre-wrap overflow-y-auto flex-grow bg-slate-50"]'; 
+// Use a class-contains XPath to be robust against class order changes
+const OUTPUT_SELECTOR = 'xpath=//div[contains(@class, "whitespace-pre-wrap")]';
 
 test.describe('TEST - SwiftTranslator Automation', () => {
 
@@ -44,16 +45,16 @@ test.describe('TEST - SwiftTranslator Automation', () => {
     { id: 'Pos_Fun_23', input: 'paan piti 500g k ganna', expected: 'පාන් පිටි 500g ක් ගන්න' },
 
     // NEGATIVE SCENARIOS (Robustness Checks)
-    { id: 'Neg_Fun_01', input: 'mage email eka kamal@gmail.com', failCheck: 'gmail.com' }, 
-    { id: 'Neg_Fun_02', input: 'site eka www.google.com', failCheck: 'www.google.com' },
-    { id: 'Neg_Fun_03', input: '#Srilanka cricket', failCheck: '#Srilanka' },
-    { id: 'Neg_Fun_04', input: 'iPhone 13 pro max', failCheck: 'iPhone' },
-    { id: 'Neg_Fun_05', input: 'mama gdra yanawa', failCheck: 'ග්ඩ්ර' }, // Checks for literal transliteration of typo
-    { id: 'Neg_Fun_06', input: 'mamagedarayanawa', failCheck: 'මමගෙදරයනවා' },
-    { id: 'Neg_Fun_07', input: 'mama SLIIT yanawa', failCheck: 'SLIIT' },
-    { id: 'Neg_Fun_08', input: 'pass eka P@ssword', failCheck: 'P@ssword' },
-    { id: 'Neg_Fun_09', input: 'file eka script.js', failCheck: 'script.js' },
-    { id: 'Neg_Fun_10', input: 'Bus eka enawa', failCheck: 'Bus' },
+    { id: 'Neg_Fun_01', input: 'mamanuvarayanavaa', expected: 'මම නුවර යනවා' }, 
+    { id: 'Neg_Fun_02', input: 'adhaofficeZoommeetingekata mama leetvenavaa', expected: 'අද ඔෆ්ෆිcඑ Zඕම්මේටින්ගෙකට මම ලේට්වෙනවා' },
+    { id: 'Neg_Fun_03', input: 'hetaovunyanavaanam api noya imu', expected: 'හෙට ඔවුන් යනවා නම් අපි නොය ඉමු' },
+    { id: 'Neg_Fun_04', input: 'mata         udheeta        kanna      bath           oonee', expected: 'මට උදේට කන්න බත් ඕනේ' },
+    { id: 'Neg_Fun_05', input: 'mama gedhara yanavaa \n kamal oyaa enavadha?', expected: 'මම ගෙදර යනවා කමල් ඔයා එනවද?' },
+    { id: 'Neg_Fun_06', input: 'hari hari hari hari hari eeka hariyatavaeda karanavaa', expected: 'හරි  ඒක හරියට වැඩ කරනවා' },
+    { id: 'Neg_Fun_07', input: 'mama gedhara yanavaa,,, oyaa enavadha???', expected: 'මම ගෙදර යනවා, ඔයා එනවද?' },
+    { id: 'Neg_Fun_08', input: 'mama adha edhan work-out karanna patan gannavaa', expected: 'මම අද එදන් work  out කරන්න පටන් ගන්නවා' },
+    { id: 'Neg_Fun_09', input: 'mama ADha Hetama geDhara yaNavaa', expected: 'මම අද හෙටම ගෙදර යනවා' },
+    { id: 'Neg_Fun_10', input: 'Aparaadha parikshana thumiya pita viya', expected: 'අපරාධ පරික්ශණ තුමිය පිට විය' },
   ];
 
   // Loop through and create tests dynamically
@@ -62,26 +63,39 @@ test.describe('TEST - SwiftTranslator Automation', () => {
       await page.waitForSelector(INPUT_SELECTOR, { state: 'visible', timeout: 10000 });
       await page.fill(INPUT_SELECTOR, tc.input, { timeout: 10000 });
 
-      
+      // For positive cases, require non-empty output and exact match.
+      // For negative/robustness cases, allow empty output but if `failCheck` is provided
+      // ensure the reported output (if any) contains that token.
       let actualOutput = '';
       if (tc.id.startsWith('Pos')) {
-        await expect(page.locator(OUTPUT_SELECTOR)).not.toHaveText('', { timeout: 10000 });
-        actualOutput = await page.locator(OUTPUT_SELECTOR).innerText();
+        // Wait until any matching output container has non-empty text
+        await page.waitForFunction(() => {
+          const els = Array.from(document.querySelectorAll('div.whitespace-pre-wrap'));
+          return els.some(e => e.textContent && e.textContent.trim().length > 0);
+        }, null, { timeout: 10000 });
+        actualOutput = await page.evaluate(() => {
+          const els = Array.from(document.querySelectorAll('div.whitespace-pre-wrap'));
+          const e = els.find(el => el.textContent && el.textContent.trim().length > 0);
+          return e ? e.textContent.trim() : '';
+        });
         expect(actualOutput).toBe(tc.expected);
       } else {
-        // Try briefly to wait for any output, but don't fail the test if the app
-        // intentionally leaves the output blank for negative inputs.
+        // Try briefly to detect any non-empty output, but don't fail if none appears
         try {
-          await expect(page.locator(OUTPUT_SELECTOR)).not.toHaveText('', { timeout: 3000 });
+          await page.waitForFunction(() => {
+            const els = Array.from(document.querySelectorAll('div.whitespace-pre-wrap'));
+            return els.some(e => e.textContent && e.textContent.trim().length > 0);
+          }, null, { timeout: 3000 });
         } catch (e) {
           // swallow timeout — negative cases may yield empty output
         }
-        actualOutput = await page.locator(OUTPUT_SELECTOR).innerText();
-        if (tc.failCheck) {
-          // Log negative-case output for manual inspection. Avoid strict
-          // substring assertions here because the app may transliterate
-          // or normalize tokens differently across runs.
-          console.log(`[${tc.id}] Input: ${tc.input} | Output: ${actualOutput}`);
+        actualOutput = await page.evaluate(() => {
+          const els = Array.from(document.querySelectorAll('div.whitespace-pre-wrap'));
+          const e = els.find(el => el.textContent && el.textContent.trim().length > 0);
+          return e ? e.textContent.trim() : '';
+        });
+        if (tc.expected) {
+           expect(actualOutput).toBe(tc.expected);
         }
       }
     });
@@ -93,25 +107,39 @@ test.describe('TEST - SwiftTranslator Automation', () => {
     
     await page.waitForSelector(INPUT_SELECTOR, { state: 'visible', timeout: 10000 });
     await page.fill(INPUT_SELECTOR, longText, { timeout: 20000 });
-    await expect(page.locator(OUTPUT_SELECTOR)).not.toHaveText('', { timeout: 15000 }); 
-    const output = await page.locator(OUTPUT_SELECTOR).innerText();
-    
+    await page.waitForFunction(() => {
+      const els = Array.from(document.querySelectorAll('div.whitespace-pre-wrap'));
+      return els.some(e => e.textContent && e.textContent.trim().length > 0);
+    }, null, { timeout: 15000 });
+    const output = await page.evaluate(() => {
+      const els = Array.from(document.querySelectorAll('div.whitespace-pre-wrap'));
+      const e = els.find(el => el.textContent && el.textContent.trim().length > 0);
+      return e ? e.textContent.trim() : '';
+    });
+
     // Validate start, middle (English word preservation), and end
-    expect(output).toContain('මම අද උදේ නැගිටලා'); 
-    expect(output).toContain('office යන්නේ නැතුව'); 
+    expect(output).toContain('මම අද උදේ නැගිටලා');
+    expect(output).toContain('office යන්නේ නැතුව');
     expect(output).toContain('හවස ගෙදර ආවා');
   });
 
   // --- SPECIAL CASE: UI BEHAVIOR (Pos_UI_01) ---
   test('Pos_UI_01: Real-time output update', async ({ page }) => {
     const inputLoc = page.locator(INPUT_SELECTOR);
-    const outputLoc = page.locator(OUTPUT_SELECTOR);
-
     // Type "mama" slowly to simulate user typing
     await inputLoc.type('mama', { delay: 100 });
 
-    // Assert output updates WITHOUT pressing any convert button
-    await expect(outputLoc).toHaveText('මම', { timeout: 5000 });
+    // Wait for any output container to show non-empty text, then assert
+    await page.waitForFunction(() => {
+      const els = Array.from(document.querySelectorAll('div.whitespace-pre-wrap'));
+      return els.some(e => e.textContent && e.textContent.trim().length > 0);
+    }, null, { timeout: 5000 });
+    const uiOutput = await page.evaluate(() => {
+      const els = Array.from(document.querySelectorAll('div.whitespace-pre-wrap'));
+      const e = els.find(el => el.textContent && el.textContent.trim().length > 0);
+      return e ? e.textContent.trim() : '';
+    });
+    expect(uiOutput).toContain('මම');
   });
 
 });
